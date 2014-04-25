@@ -20,12 +20,20 @@ namespace CS422Assignment3
         int Analog1 = 0;
         int Analog2 = 0;
         int Button1 = 0;
-        DirectSoundOut[] jaws= new DirectSoundOut[3];
-
+        WaveOut[] jaws= new WaveOut[3];
+        
+        bool isActive=true;
+        
         double x = 0;
         double y = 0;
 
-        float sharkX = 0, sharkY=0;
+        double sharkX = 0, sharkY=0;
+        double sharkRad0=0.1, sharkRad1=0.3, sharkRad2=0.5;
+
+        double minx = 0.6;
+        double maxx = 1.7;
+        double miny = 0.1;
+        double maxy = 1.1;
 
         int score = 0;
 
@@ -42,19 +50,21 @@ namespace CS422Assignment3
             _serialPort.DataReceived += new SerialDataReceivedEventHandler(sp_DataReceived);
 
             _serialPort.Open();
+            
+            jaws[0] = new WaveOut();
+            jaws[1] = new WaveOut();
+            jaws[2] = new WaveOut();
 
-            jaws[0] = new DirectSoundOut();
-            jaws[1] = new DirectSoundOut();
-            jaws[2] = new DirectSoundOut();
-
-            var jawsAudio1 = new WaveChannel32(new WaveFileReader("Sounds/Jaws1.wav"));
+            var jawsAudio1 = new WaveChannel32(new WaveFileReader("Sounds/Jaws3.wav"));
             jaws[0].Init(jawsAudio1);
-            var jawsAudio2 = new WaveChannel32(new WaveFileReader("Sounds/Jaws2.wav"));
+            var jawsAudio2 = new LoopStream(new WaveFileReader("Sounds/Jaws2.wav"));
             jaws[1].Init(jawsAudio2);
-            var jawsAudio3 = new WaveChannel32(new WaveFileReader("Sounds/Jaws3.wav"));
+            var jawsAudio3 = new LoopStream(new WaveFileReader("Sounds/Jaws1.wav"));
             jaws[2].Init(jawsAudio3);
 
+            resetShark();
 
+            
             InitializeComponent();
         }
 
@@ -95,11 +105,12 @@ namespace CS422Assignment3
             x = (Math.Cos(angle1) + (Math.Cos(angle1 + angle2)));
             y = (Math.Sin(angle1) + (Math.Sin(angle1 + angle2)));
 
-            //label1.Text = Analog1.ToString() + " " + Analog2.ToString() + " " + Button1.ToString();
+//label1.Text = Analog1.ToString() + " " + Analog2.ToString() + " " + Button1.ToString();
             label1.Text = x.ToString() + " " + y.ToString();
+            //label1.Text = sharkX.ToString() + " " + sharkY.ToString();
             _serialPort.WriteLine("H");
 
-            if (Analog1 > 200) jaws[0].Play();
+            if(isActive) checkForShark(x, y);
 
             panel1.Invalidate();
         }
@@ -119,6 +130,145 @@ namespace CS422Assignment3
             int yy = (int)(panel1.Height * ((y - miny) / (maxy - miny)));
 
             e.Graphics.DrawEllipse(pm, new Rectangle(xx - 5, panel1.Height - (yy - 5), 10, 10));
+        }
+        private void checkForShark(double x, double y)
+        {
+            label2.Text = "Score: " + score.ToString();
+
+
+            double dx = Math.Abs(x - sharkX);
+            double dy = Math.Abs(y - sharkY);
+
+            //Get distance between the cursor and shark
+            double distance = Math.Sqrt(dx * dx + dy * dy);
+            
+            if (distance <= sharkRad2)
+            {
+                if (distance <= sharkRad1)
+                {
+                    if (distance <= sharkRad0)
+                    {
+                        isActive = false;
+                        jaws[0].Play();
+                        jaws[1].Stop();
+                        jaws[2].Stop();
+                        score++;
+                        label2.Text = "Score: " + score.ToString();
+                        
+                        resetShark();
+                    }
+                    else
+                    {
+                        jaws[1].Play();
+                        //jaws[0].Stop();
+                        jaws[2].Stop();
+                    }
+                }
+                else 
+                { 
+                    jaws[2].Play();
+                    jaws[1].Stop();
+                    //jaws[0].Stop();
+                }
+            }
+            else
+            {
+                jaws[2].Stop();
+                jaws[1].Stop();
+                //jaws[0].Stop();
+            }
+
+        }
+        private void resetShark()
+        {
+            Random rand = new Random();
+            //sharkX = rand.Next((int)(minx * 1000), (int)(maxx * 1000)) / 1000;
+            //sharkY = rand.Next((int)(miny * 1000), (int)(maxy * 1000)) / 1000;
+
+            sharkX = map(rand.NextDouble(), 0, 1, minx, maxx);
+            sharkY = map(rand.NextDouble(), 0, 1, miny, maxy);
+            
+
+            isActive = true;
+            
+        }
+        public static double map(double value, double from1, double to1, double from2, double to2)
+        {
+
+            return (value - from1) / (to1 - from1) * (to2 - from2) + from2;
+
+        }
+
+  
+    }
+    
+
+
+    public class LoopStream : WaveStream
+    {
+        WaveStream sourceStream;
+
+        /// <summary>
+        /// Creates a new Loop stream
+        /// </summary>
+        /// <param name="sourceStream">The stream to read from. Note: the Read method of this stream should return 0 when it reaches the end
+        /// or else we will not loop to the start again.</param>
+        public LoopStream(WaveStream sourceStream)
+        {
+            this.sourceStream = sourceStream;
+            this.EnableLooping = true;
+        }
+
+        /// <summary>
+        /// Use this to turn looping on or off
+        /// </summary>
+        public bool EnableLooping { get; set; }
+
+        /// <summary>
+        /// Return source stream's wave format
+        /// </summary>
+        public override WaveFormat WaveFormat
+        {
+            get { return sourceStream.WaveFormat; }
+        }
+
+        /// <summary>
+        /// LoopStream simply returns
+        /// </summary>
+        public override long Length
+        {
+            get { return sourceStream.Length; }
+        }
+
+        /// <summary>
+        /// LoopStream simply passes on positioning to source stream
+        /// </summary>
+        public override long Position
+        {
+            get { return sourceStream.Position; }
+            set { sourceStream.Position = value; }
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int totalBytesRead = 0;
+
+            while (totalBytesRead < count)
+            {
+                int bytesRead = sourceStream.Read(buffer, offset + totalBytesRead, count - totalBytesRead);
+                if (bytesRead == 0)
+                {
+                    if (sourceStream.Position == 0 || !EnableLooping)
+                    {
+                        // something wrong with the source stream
+                        break;
+                    }
+                    // loop
+                    sourceStream.Position = 0;
+                }
+                totalBytesRead += bytesRead;
+            }
+            return totalBytesRead;
         }
     }
 }
