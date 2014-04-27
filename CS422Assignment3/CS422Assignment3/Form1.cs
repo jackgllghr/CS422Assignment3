@@ -1,4 +1,15 @@
-﻿using System;
+﻿/* Jack Gallagher 69537058
+ * 
+ * CS422 Assignment 3
+ * 
+ * Move the Arduino arm to catch the shark! 
+ * Listen to audio cues to determine how close you are.
+ * 
+ * The UI displays the cursor position in a panel, the xy coordinates of the cursor, and the score
+ * 
+ */
+
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -21,7 +32,8 @@ namespace CS422Assignment3
         int Analog2 = 0;
         int Button1 = 0;
         WaveOut[] jaws= new WaveOut[3];
-        
+        int currentLoop;
+
         bool isActive=true;
         
         double x = 0;
@@ -51,6 +63,7 @@ namespace CS422Assignment3
 
             _serialPort.Open();
             
+            //Set up audio outputs
             jaws[0] = new WaveOut();
             jaws[1] = new WaveOut();
             jaws[2] = new WaveOut();
@@ -62,6 +75,7 @@ namespace CS422Assignment3
             var jawsAudio3 = new LoopStream(new WaveFileReader("Sounds/Jaws1.wav"));
             jaws[2].Init(jawsAudio3);
 
+            //Set the shark to a random position
             resetShark();
 
             
@@ -98,6 +112,7 @@ namespace CS422Assignment3
 
         }
 
+        //On each tick of the timer check calculate the x and y coordinates of the arm, then check for collision
         private void timer1_Tick(object sender, EventArgs e)
         {
             angle1 = 0.5 * Math.PI * ((double)(Analog1 - 97)) / (511.0 - 97.0);
@@ -105,25 +120,21 @@ namespace CS422Assignment3
             x = (Math.Cos(angle1) + (Math.Cos(angle1 + angle2)));
             y = (Math.Sin(angle1) + (Math.Sin(angle1 + angle2)));
 
-//label1.Text = Analog1.ToString() + " " + Analog2.ToString() + " " + Button1.ToString();
-            label1.Text = x.ToString() + " " + y.ToString();
+            //label1.Text = Analog1.ToString() + " " + Analog2.ToString() + " " + Button1.ToString();
+            label1.Text = "X: "+x.ToString() + "\nY: " + y.ToString();
             //label1.Text = sharkX.ToString() + " " + sharkY.ToString();
             _serialPort.WriteLine("H");
+            
 
             if(isActive) checkForShark(x, y);
 
             panel1.Invalidate();
         }
-
+        //Paint the onscreen reticle
         private void panel1_Paint(object sender, PaintEventArgs e)
         {
             Brush cm = new SolidBrush(Color.Black);
             Pen pm = new Pen(Color.Black, 3);
-
-            double minx = 0.373511;
-            double maxx = 1.69879;
-            double miny = -0.05840;
-            double maxy = 0.98404;
 
             int xx = (int)(panel1.Width * ((x - minx) / (maxx - minx)));
 
@@ -131,6 +142,7 @@ namespace CS422Assignment3
 
             e.Graphics.DrawEllipse(pm, new Rectangle(xx - 5, panel1.Height - (yy - 5), 10, 10));
         }
+        //Check how close the cursor is to the shark
         private void checkForShark(double x, double y)
         {
             label2.Text = "Score: " + score.ToString();
@@ -142,10 +154,13 @@ namespace CS422Assignment3
             //Get distance between the cursor and shark
             double distance = Math.Sqrt(dx * dx + dy * dy);
             
+            //If at a certain radius, play the first loop
             if (distance <= sharkRad2)
             {
+                //if closer, play the faster loop
                 if (distance <= sharkRad1)
                 {
+                    //if within a small radius, "catch" the shark, increment the score, play the audio and reset the shark
                     if (distance <= sharkRad0)
                     {
                         isActive = false;
@@ -154,56 +169,64 @@ namespace CS422Assignment3
                         jaws[2].Stop();
                         score++;
                         label2.Text = "Score: " + score.ToString();
-                        
+                        timer2.Start();
                         resetShark();
                     }
                     else
                     {
-                        jaws[1].Play();
-                        //jaws[0].Stop();
-                        jaws[2].Stop();
+                        if (currentLoop != 1)
+                        {
+                            currentLoop = 1;
+                            jaws[1].Play();
+                            jaws[2].Stop();
+                        }
                     }
                 }
                 else 
-                { 
-                    jaws[2].Play();
-                    jaws[1].Stop();
-                    //jaws[0].Stop();
+                {
+                    if (currentLoop != 2)
+                    {
+                        currentLoop = 2;
+                        jaws[2].Play();
+                        jaws[1].Stop();
+                    }
                 }
             }
             else
             {
                 jaws[2].Stop();
                 jaws[1].Stop();
-                //jaws[0].Stop();
             }
 
         }
+        //set the shark to random coordinates within the boundaries set by minx,maxx, miny,maxy
         private void resetShark()
         {
             Random rand = new Random();
-            //sharkX = rand.Next((int)(minx * 1000), (int)(maxx * 1000)) / 1000;
-            //sharkY = rand.Next((int)(miny * 1000), (int)(maxy * 1000)) / 1000;
-
+            
             sharkX = map(rand.NextDouble(), 0, 1, minx, maxx);
             sharkY = map(rand.NextDouble(), 0, 1, miny, maxy);
             
-
-            isActive = true;
-            
         }
+        //Map a value from a range to another range. 
+        //Ex. map(2, 1, 3, 6, 10) = 8
+        //The value 2 in the range 1-3 is mapped to the range 6-10 so it is 8
         public static double map(double value, double from1, double to1, double from2, double to2)
         {
-
             return (value - from1) / (to1 - from1) * (to2 - from2) + from2;
+        }
 
+        private void timer2_Tick(object sender, EventArgs e)
+        {
+            isActive = true;
+            timer2.Stop();
         }
 
   
     }
     
 
-
+    //LoopStream for looping audio tracks
     public class LoopStream : WaveStream
     {
         WaveStream sourceStream;
