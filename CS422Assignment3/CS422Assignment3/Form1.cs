@@ -53,7 +53,7 @@ namespace CS422Assignment3
 
         public Form1()
         {
-            _serialPort.PortName = "COM4";
+            _serialPort.PortName = "COM6";
             _serialPort.BaudRate = 9600;
             _serialPort.Parity = Parity.None;
             _serialPort.DataBits = 8;
@@ -125,7 +125,6 @@ namespace CS422Assignment3
             //label1.Text = sharkX.ToString() + " " + sharkY.ToString();
             _serialPort.WriteLine("H");
             
-
             if(isActive) checkForShark(x, y);
 
             panel1.Invalidate();
@@ -151,7 +150,7 @@ namespace CS422Assignment3
             double dx = Math.Abs(x - sharkX);
             double dy = Math.Abs(y - sharkY);
 
-            //Get distance between the cursor and shark
+            //Get distance(radius) between the cursor and shark
             double distance = Math.Sqrt(dx * dx + dy * dy);
             
             //If at a certain radius, play the first loop
@@ -168,6 +167,7 @@ namespace CS422Assignment3
                         jaws[1].Stop();
                         jaws[2].Stop();
                         score++;
+                        pictureBox1.Visible = true;
                         label2.Text = "Score: " + score.ToString();
                         timer2.Start();
                         resetShark();
@@ -219,10 +219,22 @@ namespace CS422Assignment3
         private void timer2_Tick(object sender, EventArgs e)
         {
             isActive = true;
+            jaws[0].Stop();
+            pictureBox1.Visible = false;
             timer2.Stop();
         }
 
-  
+        private void timer3_Tick(object sender, EventArgs e)
+        {
+            MessageBox.Show("Congrats, your score is: " + score.ToString());
+            score = 0;
+        }
+
+        private void pictureBox1_Click(object sender, EventArgs e)
+        {
+
+        }
+
     }
     
 
